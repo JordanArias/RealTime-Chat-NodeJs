@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>miduChat</title>
+    <script type="module">
+        import { io } from 'https://cdn.socket.io/4.3.2/socket.io.min.js'; // Asegúrate de usar la versión que tienes instalada
+        const socket = io(); // Conecta al servidor de Socket.IO
+    </script>
     <style>
         *, *::before, *::after{
             box-sizing: border-box;
