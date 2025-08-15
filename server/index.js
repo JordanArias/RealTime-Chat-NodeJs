@@ -10,11 +10,19 @@ const app = express(); // Crea una instancia de la aplicación Express.
 const server = createServer(app); // Crea un servidor HTTP utilizando la aplicación Express.
 const io = new Server(server); // Crea una instancia de 'Server' de 'socket.io', pasándole el servidor HTTP.
 
-io.on('connection', () => { // Escucha el evento 'connection', que se emite cuando un cliente se conecta al servidor WebSocket.
+io.on('connection', (socket) => { // Escucha el evento 'connection', que se emite cuando un cliente se conecta al servidor WebSocket.
     console.log('a user has connected'); // Imprime un mensaje en la consola cuando un usuario se conecta.
+
+    socket.on('disconnect', () => { // Escucha el evento 'disconnect', que se emite cuando un cliente se desconecta del servidor.
+        console.log('a user has disconnected');
+    })
+
+    socket.on('chat message', (msg) => {    // Escucha el evento 'chat message', que se emite cuando un cliente envía un mensaje de chat.
+        io.emit('chat message', msg);  // Emite el mensaje de chat a todos los clientes conectados.
+    })
 }); // Cierra el bloque de la función de conexión.
 
- // Línea en blanco para mejorar la legibilidad.
+
 // Usa morgan como middleware
 app.use(logger('dev')); // Configura 'morgan' como middleware para registrar las solicitudes HTTP en formato 'dev'.
 
@@ -26,4 +34,4 @@ app.get('/', (req, res) =>{ // Define una ruta GET para la raíz ('/') de la apl
 server.listen(port, () => { // Inicia el servidor HTTP y lo hace escuchar en el puerto definido.
     console.log(`Server running on port ${port}`); // Imprime un mensaje en la consola indicando que el servidor está en funcionamiento.
     
-}) // Cierra el bloque de la función de escucha del servidor.
+}) // Cierra el bloque de la función de escucha del servidor.                                       

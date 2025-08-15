@@ -4,9 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>miduChat</title>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
     <script type="module">
-        import { io } from 'https://cdn.socket.io/4.3.2/socket.io.min.js'; // Asegúrate de usar la versión que tienes instalada
         const socket = io(); // Conecta al servidor de Socket.IO
+
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        const messages = document.getElementById('messages');
+
+        socket.on('chat message', (msg) => {
+            const item = `<li>${msg}</li>` 
+            messages.insertAdjacentHTML('beforeend', item);
+            console.log('respuesta:', msg);
+            
+        })
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault()
+
+            if (input.value) {
+                socket.emit('chat message', input.value);
+                input.value = '';
+            }
+        })
     </script>
     <style>
         *, *::before, *::after{
@@ -18,11 +38,8 @@
             display: grid;
             place-content: center;
             height: 100vh;
-            padding: 36px;
+            padding: 36px 36px 100px 36px;
             grid-template-rows: 1fr;
-        }
-
-        body {
             background-color: black;
         }
         #chat {
@@ -33,13 +50,52 @@
             height: 100%;
             position: relative;
         }
+        #messages {
+            color: #eee;
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+        #messages li{
+            background: #414141;
+            color: #eee;
+            padding: .5rem 1rem;
+        }
+        #messages > li:nth-child(odd){
+            background: #f4f4f4 ;
+            color: black;
+        }
+        #form {
+            bottom: 0;
+            display: flex;
+            height: 48px;
+            left: 0;
+            padding: 4px;
+            position: absolute;
+            right: 0;
+        }
+        #form button{
+            background: #45a75d;
+            color: #eee;
+            border: 0;
+            margin: 4px;
+            border-radius: 4px;
+        }
+        #input {
+            border-radius: 9999px;
+            border: 1px solid #eee;
+            flex: 1;
+            margin: 4px;
+            padding: 0 8px;
+        }
     </style>
 </head>
 </html>
 
 <body>
     <section id="chat">
-        <form action="form">
+        <ul id="messages"></ul>
+        <form id="form">
             <input type="text" name="message" id="input" placeholder="Type a message" autocomplete="off">
             <button type="submit">Enviar</button>
         </form>
