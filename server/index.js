@@ -1,14 +1,39 @@
 import express from 'express' // Importa el módulo 'express', que es un framework para construir aplicaciones web en Node.js.
 import logger from 'morgan' // Importa 'morgan', un middleware para registrar solicitudes HTTP en la consola.
 
+import dotenv from 'dotenv' // Importa 'dotenv' para cargar variables de entorno desde un archivo .env.
+import {createClient} from '@libsql/client' // Importa la función 'createClient' del cliente de base de datos libsql.
+
 import { Server } from 'socket.io'; // Importa la clase 'Server' de 'socket.io', que se utiliza para crear un servidor WebSocket.
 import { createServer } from 'node:http' // Importa la función 'createServer' del módulo 'http' de Node.js para crear un servidor HTTP.
 
-const port = process.env.PORT ?? 3000; // Define el puerto en el que el servidor escuchará. Usa el puerto definido en la variable de entorno 'PORT' o 3000 por defecto.
+// Define el puerto en el que el servidor escuchará. Usa el puerto definido en la variable de entorno 'PORT' o 3000 por defecto.
+const port = process.env.PORT ?? 3000; 
+// Crea una instancia de la aplicación Express.
+const app = express(); 
+// Crea un servidor HTTP utilizando la aplicación Express.
+const server = createServer(app); 
+// Crea una instancia de 'Server' de 'socket.io', pasándole el servidor HTTP.
+const io = new Server(server); 
 
-const app = express(); // Crea una instancia de la aplicación Express.
-const server = createServer(app); // Crea un servidor HTTP utilizando la aplicación Express.
-const io = new Server(server); // Crea una instancia de 'Server' de 'socket.io', pasándole el servidor HTTP.
+
+dotenv.config(); // Carga las variables de entorno desde el archivo .env para que estén disponibles en el proceso.
+
+//CONEXION A LA BASE DE DATOS
+// Crea un cliente de base de datos utilizando la URL y el token de autenticación proporcionados en las variables de entorno.
+const db = createClient({
+    url:'libsql://fast-becatron-fabrizio.aws-us-east-1.turso.io', // URL de conexión a la base de datos.
+    authToken: process.env.DB_TOKEN // Token de autenticación para acceder a la base de datos.
+})
+
+// Ejecuta una consulta SQL para crear una tabla llamada 'messages' si no existe.
+await db.execute(
+    `CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, // Columna 'id' que se incrementa automáticamente y es la clave primaria.
+    content TEXT // Columna 'content' que almacena el contenido del mensaje.
+    )`
+);
+
 
 io.on('connection', (socket) => { // Escucha el evento 'connection', que se emite cuando un cliente se conecta al servidor WebSocket.
     console.log('a user has connected'); // Imprime un mensaje en la consola cuando un usuario se conecta.
@@ -17,8 +42,18 @@ io.on('connection', (socket) => { // Escucha el evento 'connection', que se emit
         console.log('a user has disconnected');
     })
 
-    socket.on('chat message', (msg) => {    // Escucha el evento 'chat message', que se emite cuando un cliente envía un mensaje de chat.
-        io.emit('chat message', msg);  // Emite el mensaje de chat a todos los clientes conectados.
+    socket.on('chat message', async (msg) => {    // Escucha el evento 'chat message', que se emite cuando un cliente envía un mensaje de chat.
+        let result;
+        try {
+            result = await db.execute({
+                sql:`INSERT INTO messages (content) VALUES (:content)`,
+                args: { content:msg }
+            })
+        } catch (error) {
+            console.log(error);
+            return
+        }
+        io.emit('chat message', msg, result.lastInsertRowid.toString());  // Emite el mensaje de chat a todos los clientes conectados.
     })
 }); // Cierra el bloque de la función de conexión.
 
