@@ -5,29 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>miduChat</title>
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
-    <script type="module">
-        const socket = io(); // Conecta al servidor de Socket.IO
+    <script type="module"> // Indica que el script se debe tratar como un módulo ES6.
+        //PARA CREAR UN USUARIO
+        const getUsername = async() => {
+            const username = localStorage.getItem('username');
+            if (username) {
+                console.log(`User existed ${username}`);
+                return username;
+            }
+            //Recibimos usuario random consultando una api gratuita
+            const res = await fetch('https://randomuser.me/api/');
+            const data = await res.json();
 
-        const form = document.getElementById('form');
-        const input = document.getElementById('input');
-        const messages = document.getElementById('messages');
+            // opción 1: obtener username
+            // const randomUsername = data.results[0].login.username;
 
-        socket.on('chat message', (msg) => {
-            const item = `<li>${msg}</li>` 
-            messages.insertAdjacentHTML('beforeend', item);
-            console.log('respuesta:', msg);
-            
+            // opción 2: obtener nombre completo
+            const randomUsername = `${data.results[0].name.first} ${data.results[0].name.last}`;
+
+            localStorage.setItem('username', randomUsername);
+            return randomUsername;
+
+        } 
+
+        const socket = io({ // Crea una conexión al servidor de Socket.IO.
+            auth: { // Configura la autenticación para la conexión.
+                username: await getUsername(),
+                serverOffset: 0 // Establece un valor inicial para el desplazamiento del servidor.
+            }
+        }); // Conecta al servidor de Socket.IO
+
+        const form = document.getElementById('form'); // Obtiene el elemento del formulario por su ID.
+        const input = document.getElementById('input'); // Obtiene el campo de entrada por su ID.
+        const messages = document.getElementById('messages'); // Obtiene el elemento de la lista de mensajes por su ID.               
+
+        socket.on('chat message', (msg, serverOffset, username) => { // Escucha el evento 'chat message' del servidor.
+            // Crea un nuevo elemento de lista con el mensaje recibido.
+            const item = `<li>
+            <p>${msg}</p>
+            <small>${username}</small>
+            </li>`
+            messages.insertAdjacentHTML('beforeend', item); // Inserta el nuevo mensaje al final de la lista de mensajes.
+            console.log('respuesta:', msg); 
+            //Actualizar para saber donde se ha quedado el cliente(saber cual es el ultimo sms)
+            socket.auth.serverOffset = serverOffset; // Actualiza el desplazamiento del servidor con el valor recibido.
+            //scroll to bottom of messages
+            messages.scrollTop = messages.scrollHeight;
         })
 
-        form.addEventListener('submit', (e) => {
-            e.preventDefault()
+        form.addEventListener('submit', (e) => { // Agrega un evento para manejar el envío del formulario.
+            e.preventDefault() // Previene el comportamiento por defecto del formulario (recarga de página).
 
-            if (input.value) {
-                socket.emit('chat message', input.value);
-                input.value = '';
+            if (input.value) { // Verifica si hay un valor en el campo de entrada.
+                socket.emit('chat message', input.value); // Envía el mensaje al servidor.
+                input.value = ''; // Limpia el campo de entrada después de enviar el mensaje.
             }
         })
     </script>
+
     <style>
         *, *::before, *::after{
             box-sizing: border-box;
@@ -55,9 +90,13 @@
             list-style-type: none;
             margin: 0;
             padding: 0;
+            overflow-y: scroll;
+            height: 100%;
+            scroll-behavior: smooth;
+            padding-bottom: 48px;
         }
         #messages li{
-            background: #414141;
+            background: #3f6999;
             color: #eee;
             padding: .5rem 1rem;
         }

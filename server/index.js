@@ -26,35 +26,59 @@ const db = createClient({
     authToken: process.env.DB_TOKEN // Token de autenticación para acceder a la base de datos.
 })
 
+
+// await db.execute(`DROP TABLE IF EXISTS messages;`); // Elimina la tabla si existe.
+
 // Ejecuta una consulta SQL para crear una tabla llamada 'messages' si no existe.
+// Columna 'id' que se incrementa automáticamente y es la clave primaria.
+// Columna 'content' que almacena el contenido del mensaje.
 await db.execute(
     `CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, // Columna 'id' que se incrementa automáticamente y es la clave primaria.
-    content TEXT // Columna 'content' que almacena el contenido del mensaje.
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT,
+    user TEXT 
     )`
 );
 
 
-io.on('connection', (socket) => { // Escucha el evento 'connection', que se emite cuando un cliente se conecta al servidor WebSocket.
+io.on('connection', async (socket) => { // Escucha el evento 'connection', que se emite cuando un cliente se conecta al servidor WebSocket.
     console.log('a user has connected'); // Imprime un mensaje en la consola cuando un usuario se conecta.
 
     socket.on('disconnect', () => { // Escucha el evento 'disconnect', que se emite cuando un cliente se desconecta del servidor.
-        console.log('a user has disconnected');
-    })
+        console.log('a user has disconnected'); // Imprime un mensaje en la consola cuando un usuario se desconecta.
+    });
 
-    socket.on('chat message', async (msg) => {    // Escucha el evento 'chat message', que se emite cuando un cliente envía un mensaje de chat.
-        let result;
+    socket.on('chat message', async (msg) => { // Escucha el evento 'chat message', que se emite cuando un cliente envía un mensaje de chat.
+        let result; // Declara una variable para almacenar el resultado de la consulta a la base de datos.
+        const username = socket.handshake.auth.username ?? 'anonymous'
         try {
-            result = await db.execute({
-                sql:`INSERT INTO messages (content) VALUES (:content)`,
-                args: { content:msg }
-            })
-        } catch (error) {
-            console.log(error);
-            return
+            result = await db.execute({ // Intenta ejecutar una consulta SQL para insertar el mensaje en la base de datos.
+                sql:`INSERT INTO messages (content, user) VALUES (:msg, :username)`, // Consulta SQL para insertar el contenido del mensaje.
+                args: { msg, username } // Argumentos para la consulta, donde 'content' es el mensaje recibido.
+            });
+        } catch (error) { // Captura cualquier error que ocurra durante la ejecución de la consulta.
+            console.log(error); // Imprime el error en la consola para facilitar la depuración.
+            return; // Sale de la función si hay un error.
         }
-        io.emit('chat message', msg, result.lastInsertRowid.toString());  // Emite el mensaje de chat a todos los clientes conectados.
-    })
+        io.emit('chat message', msg, result.lastInsertRowid.toString(), username); // Emite el mensaje de chat a todos los clientes conectados, incluyendo el ID del mensaje insertado.
+    });
+
+    console.log('AUTH: ',socket.handshake.auth); // Imprime en la consola la información de autenticación del socket.
+    
+    if (!socket.recovered) { // Verifica si el socket no ha recuperado mensajes sin conexión.
+        try {
+            const result = await db.execute({ // Intenta ejecutar una consulta SQL para recuperar mensajes anteriores.
+                sql: `SELECT id, content, user FROM messages WHERE id > ?`, // Consulta SQL para seleccionar mensajes con ID mayor que el desplazamiento del servidor.
+                args: [socket.handshake.auth.serverOffset ?? 0] // Argumentos para la consulta, usando el desplazamiento del servidor o 0 si no está definido.
+            });
+
+            result.rows.forEach(row => { // Itera sobre cada fila de resultados devueltos por la consulta.
+                socket.emit('chat message', row.content, row.id.toString(), row.user); // Emite cada mensaje recuperado al cliente conectado.
+            });
+        } catch (error) { // Captura cualquier error que ocurra durante la ejecución de la consulta.
+            console.log(error); // Imprime el error en la consola para facilitar la depuración.
+        }
+    }
 }); // Cierra el bloque de la función de conexión.
 
 
